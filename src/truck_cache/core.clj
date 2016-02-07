@@ -4,6 +4,7 @@
    [org.httpkit.server :refer (run-server)]
    [compojure.core :refer (routes GET POST)]
    [compojure.handler :as handler]
+   [ring.middleware.logger :as logger]
    ;; get
    [org.httpkit.client :as http]
    [clojure.walk :refer (keywordize-keys stringify-keys)]
@@ -34,7 +35,6 @@
 (defn fetch-from-backend [state params]
   (let [url (:remote-url state)
         timeout (:remote-timeout state)]
-    (println "Will request" url "with query params:" params)
     ;; we will issue request and wait for @promise to be fullfilled, since
     ;; it's easier to understand
     (let [{:keys [status error body headers]} @(http/get url
@@ -97,7 +97,6 @@ evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
 (def server nil)
 
 (defn create-state []
-
   {:cache (atom {})
    ;; http-kit client uses one 'timeout' parameter as both
    ;; connection and read timeouts. So, since our clients
@@ -108,9 +107,12 @@ evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
 
 (defn start-app []
   (when (nil? server)
+    (org.apache.log4j.BasicConfigurator/configure)
     (alter-var-root #'server (constantly
-                              (run-server (app-routes (create-state))
-                                          {:port 3344})))))
+                              (run-server
+                               (logger/wrap-with-logger
+                                (app-routes (create-state)))
+                               {:port 3344})))))
 
 (defn stop-app []
   (when-not (nil? server)
