@@ -117,7 +117,8 @@ evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
 (defn stop-app []
   (when-not (nil? server)
     (println "Stop")
-    (server :timeout 100)))
+    (server :timeout 100)
+    (alter-var-root #'server (constantly nil))))
 
 (defn restart []
   "Stops running server, if any, refreshes namespace, and starts new one."
