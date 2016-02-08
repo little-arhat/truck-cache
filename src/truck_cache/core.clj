@@ -55,24 +55,26 @@
        ;; We also have to stringify keys in headers map
        :headers (-> headers (dissoc :content-encoding) stringify-keys)})))
 
-;; This function helps us to test correct cache management
-;; It would be nice to save state here as well, but
-(defmacro with-cache [cache cache-key should-save-fn? & forms]
-  "Returns cached value from *cache* for given *cache-key*. If nothing present,
-evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
-  `(if-let [cached# (@~cache ~cache-key)]
+
+(defn with-cache* [cache cache-key should-save-fn? eval-fn]
+  (if-let [cached (@cache cache-key)]
     ;; found, respond straight away
-    cached#
+    cached
     ;; otherwise, use supplied forms
-    (let [result# (do ~@forms)]
-      (when (~should-save-fn? result#)
+    (let [result (eval-fn)]
+      (when (should-save-fn? result)
         ;; cache the successful response...
         ;; XXX: ideally, we should obey Expires or E-Tag headers in response
         ;; but since backend server always responds with Date equal Expires
         ;; we will just cache stuff forever.
         ;; This is also simplifies implementation.
-        (swap! ~cache assoc ~cache-key result#))
-      result#)))
+        (swap! cache assoc cache-key result))
+      result)))
+
+(defmacro with-cache [cache cache-key should-save-fn? & forms]
+  "Returns cached value from *cache* for given *cache-key*. If nothing present,
+evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
+  `(with-cache* ~cache ~cache-key ~should-save-fn? (fn [] ~@forms)))
 
 (defn geocode [state]
   (fn [req]
