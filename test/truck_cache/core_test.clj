@@ -12,25 +12,6 @@
 (defn- equal [a b & msg]
   (is (= a b) msg))
 
-(deftest test-ulity-functions
-  (testing "query string translated to query params properly"
-    (equal (query-params nil)
-           {})
-    (equal (query-params "")
-           {})
-    (equal (query-params "address")
-           {:address ""})
-    (equal (query-params "address=")
-           {:address ""})
-    (equal (query-params "address=Something%20distant")
-           {:address "Something%20distant"})
-    (equal (query-params "address=Moscow&and=more")
-           {:address "Moscow" :and "more"}))
-  (testing "2xx HTTP status codes considered successful"
-    (ist (status-ok? 200))
-    (ist (status-ok? 250))
-    (isf (status-ok? 199))
-    (isf (status-ok? 301))))
 
 (deftest test-state-management
   (testing "newly created state should contain empty cache"
@@ -80,10 +61,10 @@
             handler (geocode state)]
         (equal (count @(:cache state))
                0)
-        (handler {:query-string "address=Moscow"})
+        (handler {:query-params {"address" "Moscow"}})
         (equal (count @(:cache state))
                1)
-        (ist (contains? @(:cache state) (query-params "address=Moscow"))))))
+        (ist (contains? @(:cache state) {"address" "Moscow"} )))))
   (testing "Should not save errors from backend"
     (with-mocked-result #'http/get (atom {:status 404 :body "" :headers {} :error nil})
       (let [state (create-state)

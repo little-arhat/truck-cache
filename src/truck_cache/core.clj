@@ -4,7 +4,8 @@
    [org.httpkit.server :refer (run-server)]
    [compojure.core :refer (routes GET POST)]
    [compojure.handler :as handler]
-   [ring.middleware.logger :as logger]
+   [ring.middleware.logger :refer (wrap-with-logger)]
+   [ring.middleware.params :refer (wrap-params)]
    ;; get
    [org.httpkit.client :as http]
    [clojure.walk :refer (keywordize-keys stringify-keys)]
@@ -14,20 +15,6 @@
    [clojure.tools.namespace.repl :refer (refresh)]
    ))
 
-(defn split-kv-pair [kv]
-  (if (.contains kv "=")
-    (clojure.string/split kv #"=" 2) ;; proceed normally
-    [kv ""])) ;; fallback
-
-(defn query-params [query-string]
-  "Parses query string and returns it as kv map"
-  (if (or (nil? query-string) (= query-string ""))
-    {}
-    (->>
-     (clojure.string/split query-string #"&")
-     (map split-kv-pair)
-     (into {})
-     keywordize-keys)))
 
 (defn status-ok? [status]
   (and (>= status 200) (< status 300)))
@@ -78,7 +65,7 @@ evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
 
 (defn geocode [state]
   (fn [req]
-    (let [qp (query-params (:query-string req))]
+    (let [qp (:query-params req)]
       (try
         (with-cache (:cache state) qp #(status-ok? (:status %))
           (fetch-from-backend state qp))
@@ -112,8 +99,11 @@ evaluates *forms* and if *should-save-fn?* returns true for result, caches it."
     (org.apache.log4j.BasicConfigurator/configure)
     (alter-var-root #'server (constantly
                               (run-server
-                               (logger/wrap-with-logger
-                                (app-routes (create-state)))
+                               (->
+                                (create-state)
+                                app-routes
+                                wrap-with-logger
+                                wrap-params)
                                {:port 3344})))))
 
 (defn stop-app []
